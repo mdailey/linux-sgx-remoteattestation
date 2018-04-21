@@ -192,7 +192,8 @@ int ServiceProvider::sp_ra_proc_msg1_req(Messages::MessageMSG1 msg1, Messages::M
             break;
         }
 
-        p_msg2->quote_type = SAMPLE_QUOTE_LINKABLE_SIGNATURE;
+
+        p_msg2->quote_type = Settings::quote_type;
         p_msg2->kdf_id = AES_CMAC_KDF_ID;
 
         // Create gb_ga
@@ -262,7 +263,7 @@ int ServiceProvider::sp_ra_proc_msg1_req(Messages::MessageMSG1 msg1, Messages::M
         for (auto x : p_msg2->spid.id)
             msg2->add_spid(x);
 
-        msg2->set_quote_type(SAMPLE_QUOTE_LINKABLE_SIGNATURE);
+        msg2->set_quote_type(Settings::quote_type);
         msg2->set_cmac_kdf_id(AES_CMAC_KDF_ID);
 
         for (auto x : p_msg2->sign_gb_ga.x) {

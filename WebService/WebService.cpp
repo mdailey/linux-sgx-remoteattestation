@@ -205,12 +205,15 @@ bool WebService::verifyQuote(uint8_t *quote, uint8_t *pseManifest, uint8_t *nonc
     headers = curl_slist_append(headers, "Content-Type: application/json");
 
     string payload = encoded_quote;
-
     string url = Settings::ias_url + "report";
+
+    Log("Sending quote verification request to IAS");
+    Log(" Url: %s", url);
+    Log(" Body: %s", payload);
+
     this->sendToIAS(url, IAS::report, payload, headers, &ias_response_container, &response_header);
 
-
-    if (response_header.response_status == 201) {
+    if (response_header.response_status == 200) {
         Log("Quote attestation successful, new report has been created");
 
         string response(ias_response_container.p_response);
@@ -219,6 +222,8 @@ bool WebService::verifyQuote(uint8_t *quote, uint8_t *pseManifest, uint8_t *nonc
         *result = res;
     } else {
         Log("Quote attestation returned status: %d", response_header.response_status);
+        Log(" Content-Length: %d", response_header.content_length);
+        Log(" Request-Id: %s", response_header.request_id);
         return true;
     }
 

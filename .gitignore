@@ -1,0 +1,5 @@
+GeneralSettings.h
+*.crt
+*.key
+*.pem
+*.pfx
