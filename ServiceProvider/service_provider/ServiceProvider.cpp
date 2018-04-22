@@ -489,9 +489,17 @@ int ServiceProvider::sp_ra_proc_msg3_req(Messages::MessageMSG3 msg, Messages::At
         uint8_t aes_gcm_iv[SAMPLE_SP_IV_SIZE] = {0};
         p_att_result_msg->secret.payload_size = MAX_VERIFICATION_RESULT;
 
-        if ((IAS_QUOTE_OK == attestation_report.status) &&
+        Log("status %d (ok %d) pse status %d (ok %d) policy %d", attestation_report.status, IAS_QUOTE_OK, attestation_report.pse_status, IAS_PSE_OK, isv_policy_passed);
+
+        if ((IAS_QUOTE_OK == attestation_report.status || IAS_QUOTE_GROUP_OUT_OF_DATE == attestation_report.status) &&
                 (IAS_PSE_OK == attestation_report.pse_status) &&
                 (isv_policy_passed == true)) {
+
+            if (attestation_report.status == IAS_QUOTE_GROUP_OUT_OF_DATE)
+            {
+                Log("WARNING: Platform requires SGX BIOS update");
+            }
+
             memset(validation_result, '\0', MAX_VERIFICATION_RESULT);
             validation_result[0] = 0;
             validation_result[1] = 1;
@@ -505,6 +513,17 @@ int ServiceProvider::sp_ra_proc_msg3_req(Messages::MessageMSG3 msg, Messages::At
                                                 NULL,
                                                 0,
                                                 &p_att_result_msg->secret.payload_tag);
+
+            for (int i = 0; i < 16; i++)
+            {
+                Log("  Payload tag byte %d: %d", i, (int)p_att_result_msg->secret.payload_tag[i]);
+            }
+
+        }
+        else
+        {
+            Log("Not provisioning secret due to report status %d or pse status %d or isv policy %d",
+                attestation_report.status, attestation_report.pse_status, isv_policy_passed);
         }
 
     } while(0);

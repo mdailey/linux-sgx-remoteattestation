@@ -3,3 +3,7 @@ GeneralSettings.h
 *.key
 *.pem
 *.pfx
+.idea
+*.so
+cmake-build-release
+cmake-build-debug

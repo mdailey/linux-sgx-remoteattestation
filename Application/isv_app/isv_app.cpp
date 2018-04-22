@@ -6,6 +6,7 @@
 using namespace util;
 
 #include "MessageHandler.h"
+#include "isv_enclave_u.h"
 
 int Main(int argc, char* argv[]) {
     LogBase::Inst();
@@ -31,10 +32,4 @@ int main( int argc, char **argv ) {
 
     return -1;
 }
-
-
-
-
-
-
 

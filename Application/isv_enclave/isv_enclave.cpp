@@ -262,14 +262,14 @@ sgx_status_t verify_att_result_mac(sgx_ra_context_t context,
     return ret;
 }
 
-
 sgx_status_t verify_secret_data (
     sgx_ra_context_t context,
     uint8_t *p_secret,
     uint32_t secret_size,
     uint8_t *p_gcm_mac,
     uint32_t max_verification_length,
-    uint8_t *p_ret) {
+    uint8_t *p_ret)
+{
     sgx_status_t ret = SGX_SUCCESS;
     sgx_ec_key_128bit_t sk_key;
 
@@ -281,6 +281,8 @@ sgx_status_t verify_secret_data (
 
         uint8_t *decrypted = (uint8_t*) malloc(sizeof(uint8_t) * secret_size);
         uint8_t aes_gcm_iv[12] = {0};
+
+
 
         ret = sgx_rijndael128GCM_decrypt(&sk_key,
                                          p_secret,

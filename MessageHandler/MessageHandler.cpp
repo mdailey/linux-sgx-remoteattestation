@@ -327,6 +327,11 @@ string MessageHandler::handleAttestationResult(Messages::AttestationMessage msg)
                                  MAX_VERIFICATION_RESULT,
                                  NULL);
 
+        for (int i = 0; i < 16; i++)
+        {
+            Log("  Payload tag byte %d: %d", i, (int)p_att_result_msg_body->secret.payload_tag[i]);
+        }
+
         SafeFree(p_att_result_msg_full);
 
         if (SGX_SUCCESS != ret) {
