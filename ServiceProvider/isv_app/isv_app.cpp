@@ -8,7 +8,8 @@
 
 using namespace util;
 
-int Main(int argc, char *argv[]) {
+int Main(int argc, char *argv[])
+{
     LogBase::Inst();
 
     int ret = 0;
@@ -21,13 +22,19 @@ int Main(int argc, char *argv[]) {
 }
 
 
-int main( int argc, char **argv ) {
-    try {
+int main(int argc, char **argv)
+{
+    try
+    {
         int ret = Main(argc, argv);
         return ret;
-    } catch (std::exception & e) {
+    }
+    catch (std::exception &e)
+    {
         Log("exception: %s", e.what());
-    } catch (...) {
+    }
+    catch (...)
+    {
         Log("unexpected exception");
     }
 

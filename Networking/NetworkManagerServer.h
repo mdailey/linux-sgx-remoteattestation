@@ -5,8 +5,8 @@ class NetworkManagerServer : public NetworkManager {
 public:
     static NetworkManagerServer* getInstance(int port);
     void Init();
-    void connectCallbackHandler(CallbackHandler cb);
     void startService();
+    void setCallbackSessionStart(CallbackSessionStart css);
 
 private:
     NetworkManagerServer();

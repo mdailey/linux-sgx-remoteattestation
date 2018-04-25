@@ -17,7 +17,10 @@
 
 using namespace std;
 
-typedef function<vector<string>(string, int)> CallbackHandler;
+class AbstractNetworkOps;
+
+typedef function<vector<string>(std::string, int)> CallbackHandler;
+typedef function<void(AbstractNetworkOps *)> CallbackSessionClose;
 
 class AbstractNetworkOps {
 
@@ -29,6 +32,7 @@ public:
     virtual ~AbstractNetworkOps();
     ssl_socket::lowest_layer_type& socket();
     void setCallbackHandler(CallbackHandler cb);
+    void setCallbackSessionClose(CallbackSessionClose cbsc);
 
 protected:
     ssl_socket socket_;
@@ -42,14 +46,8 @@ protected:
 
 private:
     void saveCloseSocket();
+    CallbackSessionClose callback_session_close;
 
 };
 
-
 #endif
-
-
-
-
-
-

@@ -8,7 +8,8 @@ using namespace util;
 #include "MessageHandler.h"
 #include "isv_enclave_u.h"
 
-int Main(int argc, char* argv[]) {
+int Main(int argc, char *argv[])
+{
     LogBase::Inst();
 
     int ret = 0;
@@ -21,13 +22,19 @@ int Main(int argc, char* argv[]) {
 }
 
 
-int main( int argc, char **argv ) {
-    try {
+int main(int argc, char **argv)
+{
+    try
+    {
         return Main(argc, argv);
-    } catch (std::exception& e) {
+    }
+    catch (std::exception &e)
+    {
         Log("exception: %s", e.what());
-    } catch (...) {
-        Log("unexpected exception") ;
+    }
+    catch (...)
+    {
+        Log("unexpected exception");
     }
 
     return -1;

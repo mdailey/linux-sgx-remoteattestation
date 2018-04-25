@@ -1,17 +1,23 @@
 #include "NetworkManagerServer.h"
 
-NetworkManagerServer* NetworkManagerServer::instance = NULL;
 
-NetworkManagerServer::NetworkManagerServer() {}
+NetworkManagerServer *NetworkManagerServer::instance = NULL;
 
 
-void NetworkManagerServer::Init() {
+NetworkManagerServer::NetworkManagerServer()
+{}
+
+
+void NetworkManagerServer::Init()
+{
     this->server = new Server(this->io_service, this->port);
 }
 
 
-NetworkManagerServer* NetworkManagerServer::getInstance(int port) {
-    if (instance == NULL) {
+NetworkManagerServer *NetworkManagerServer::getInstance(int port)
+{
+    if (instance == NULL)
+    {
         instance = new NetworkManagerServer();
         instance->setPort(port);
     }
@@ -20,14 +26,14 @@ NetworkManagerServer* NetworkManagerServer::getInstance(int port) {
 }
 
 
-void NetworkManagerServer::startService() {
+void NetworkManagerServer::startService()
+{
     this->server->start_accept();
     this->io_service.run();
 }
 
 
-void NetworkManagerServer::connectCallbackHandler(CallbackHandler cb) {
-    this->server->connectCallbackHandler(cb);
+void NetworkManagerServer::setCallbackSessionStart(CallbackSessionStart css)
+{
+    this->server->setCallbackSessionStart(css);
 }
-
-

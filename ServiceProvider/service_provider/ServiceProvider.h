@@ -10,6 +10,7 @@
 #include <time.h>
 #include <string.h>
 #include <iostream>
+#include <Networking/NetworkManager.h>
 
 #include "Messages.pb.h"
 #include "UtilityFunctions.h"
@@ -40,6 +41,7 @@ enum sp_ra_msg_status_t {
     SP_RETRIEVE_SIGRL_ERROR
 };
 
+
 typedef struct _sp_db_item_t {
     sgx_ec256_public_t       	g_a;
     sgx_ec256_public_t       	g_b;
@@ -55,16 +57,23 @@ typedef struct _sp_db_item_t {
 class ServiceProvider {
 
 public:
-    ServiceProvider(WebService *ws);
+    ServiceProvider(NetworkManager *nm, WebService *ws);
     virtual ~ServiceProvider();
     int sp_ra_proc_msg0_req(const uint32_t extended_epid_group_id);
     int sp_ra_proc_msg1_req(Messages::MessageMSG1 msg1, Messages::MessageMSG2 *msg2);
     int sp_ra_proc_msg3_req(Messages::MessageMSG3 msg, Messages::AttestationMessage *att_msg);
     sgx_ra_msg3_t* assembleMSG3(Messages::MessageMSG3 msg);
     int sp_ra_proc_app_att_hmac(Messages::SecretMessage *new_msg, string hmac_key, string hmac_key_filename);
+    vector<string> incomingHandler(string v, int type);
 
 private:
+    string handleMSG0(Messages::MessageMsg0 msg);
+    string handleMSG1(Messages::MessageMSG1 msg1);
+    string handleMSG3(Messages::MessageMSG3 msg);
+    string handleAppAttOk();
+
     WebService *ws = NULL;
+    NetworkManager *nm = NULL;
     bool g_is_sp_registered = false;
     uint32_t extended_epid_group_id;
     sp_db_item_t g_sp_db;
@@ -73,13 +82,3 @@ private:
 };
 
 #endif
-
-
-
-
-
-
-
-
-
-

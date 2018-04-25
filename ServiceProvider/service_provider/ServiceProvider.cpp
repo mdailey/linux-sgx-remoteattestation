@@ -2,26 +2,36 @@
 #include "sample_libcrypto.h"
 #include "../GeneralSettings.h"
 
-// This is the private EC key of SP, the corresponding public EC key is
+// This is the private EC key of SP. The corresponding public EC key is
 // hard coded in isv_enclave. It is based on NIST P-256 curve.
+
 static const sample_ec256_private_t g_sp_priv_key = {
-    {
-        0x90, 0xe7, 0x6c, 0xbb, 0x2d, 0x52, 0xa1, 0xce,
-        0x3b, 0x66, 0xde, 0x11, 0x43, 0x9c, 0x87, 0xec,
-        0x1f, 0x86, 0x6a, 0x3b, 0x65, 0xb6, 0xae, 0xea,
-        0xad, 0x57, 0x34, 0x53, 0xd1, 0x03, 0x8c, 0x01
-    }
+        {
+                0x90, 0xe7, 0x6c, 0xbb, 0x2d, 0x52, 0xa1, 0xce,
+                0x3b, 0x66, 0xde, 0x11, 0x43, 0x9c, 0x87, 0xec,
+                0x1f, 0x86, 0x6a, 0x3b, 0x65, 0xb6, 0xae, 0xea,
+                0xad, 0x57, 0x34, 0x53, 0xd1, 0x03, 0x8c, 0x01
+        }
 };
 
-ServiceProvider::ServiceProvider(WebService *ws) : ws(ws) {}
 
-ServiceProvider::~ServiceProvider() {}
+ServiceProvider::ServiceProvider(NetworkManager *nm, WebService *ws)
+{
+    this->nm = nm;
+    this->ws = ws;
+}
 
 
-int ServiceProvider::sp_ra_proc_msg0_req(const uint32_t id) {
+ServiceProvider::~ServiceProvider()
+{}
+
+
+int ServiceProvider::sp_ra_proc_msg0_req(const uint32_t id)
+{
     int ret = -1;
 
-    if (!this->g_is_sp_registered || (this->extended_epid_group_id != id)) {
+    if (!this->g_is_sp_registered || (this->extended_epid_group_id != id))
+    {
         Log("Received extended EPID group ID: %d", id);
 
         extended_epid_group_id = id;
@@ -33,24 +43,27 @@ int ServiceProvider::sp_ra_proc_msg0_req(const uint32_t id) {
 }
 
 
-int ServiceProvider::sp_ra_proc_msg1_req(Messages::MessageMSG1 msg1, Messages::MessageMSG2 *msg2) {
+int ServiceProvider::sp_ra_proc_msg1_req(Messages::MessageMSG1 msg1, Messages::MessageMSG2 *msg2)
+{
     ra_samp_response_header_t **pp_msg2;
     int ret = 0;
-    ra_samp_response_header_t* p_msg2_full = NULL;
+    ra_samp_response_header_t *p_msg2_full = NULL;
     sgx_ra_msg2_t *p_msg2 = NULL;
     sample_ecc_state_handle_t ecc_state = NULL;
     sample_status_t sample_ret = SAMPLE_SUCCESS;
     bool derive_ret = false;
 
-    if (!g_is_sp_registered) {
+    if (!g_is_sp_registered)
+    {
         return SP_UNSUPPORTED_EXTENDED_EPID_GROUP;
     }
 
-    do {
+    do
+    {
         //=====================  RETRIEVE SIGRL FROM IAS =======================
         uint8_t GID[4];
 
-        for (int i=0; i<4; i++)
+        for (int i = 0; i < 4; i++)
             GID[i] = msg1.gid(i);
 
         reverse(begin(GID), end(GID));
@@ -69,20 +82,24 @@ int ServiceProvider::sp_ra_proc_msg1_req(Messages::MessageMSG1 msg1, Messages::M
         uint8_t gaXLittleEndian[32];
         uint8_t gaYLittleEndian[32];
 
-        for (int i=0; i<32; i++) {
+        for (int i = 0; i < 32; i++)
+        {
             gaXLittleEndian[i] = msg1.gax(i);
             gaYLittleEndian[i] = msg1.gay(i);
         }
 
-        sample_ec256_public_t client_pub_key = {{0},{0}};
+        sample_ec256_public_t client_pub_key = {{0},
+                                                {0}};
 
-        for (int x=0; x<DH_SHARED_KEY_LEN; x++) {
+        for (int x = 0; x < DH_SHARED_KEY_LEN; x++)
+        {
             client_pub_key.gx[x] = gaXLittleEndian[x];
             client_pub_key.gy[x] = gaYLittleEndian[x];
         }
 
         // Need to save the client's public ECCDH key to local storage
-        if (memcpy_s(&g_sp_db.g_a, sizeof(g_sp_db.g_a), &client_pub_key, sizeof(client_pub_key))) {
+        if (memcpy_s(&g_sp_db.g_a, sizeof(g_sp_db.g_a), &client_pub_key, sizeof(client_pub_key)))
+        {
             Log("Error, cannot do memcpy", log::error);
             ret = SP_INTERNAL_ERROR;
             break;
@@ -90,26 +107,30 @@ int ServiceProvider::sp_ra_proc_msg1_req(Messages::MessageMSG1 msg1, Messages::M
 
         // Generate the Service providers ECCDH key pair.
         sample_ret = sample_ecc256_open_context(&ecc_state);
-        if(SAMPLE_SUCCESS != sample_ret) {
+        if (SAMPLE_SUCCESS != sample_ret)
+        {
             Log("Error, cannot get ECC context", log::error);
             ret = -1;
             break;
         }
 
 
-        sample_ec256_public_t pub_key = {{0},{0}};
+        sample_ec256_public_t pub_key = {{0},
+                                         {0}};
         sample_ec256_private_t priv_key = {{0}};
         sample_ret = sample_ecc256_create_key_pair(&priv_key, &pub_key, ecc_state);
 
-        if (SAMPLE_SUCCESS != sample_ret) {
+        if (SAMPLE_SUCCESS != sample_ret)
+        {
             Log("Error, cannot get key pair", log::error);
             ret = SP_INTERNAL_ERROR;
             break;
         }
 
         // Need to save the SP ECCDH key pair to local storage.
-        if (memcpy_s(&g_sp_db.b, sizeof(g_sp_db.b), &priv_key,sizeof(priv_key)) ||
-                memcpy_s(&g_sp_db.g_b, sizeof(g_sp_db.g_b), &pub_key,sizeof(pub_key))) {
+        if (memcpy_s(&g_sp_db.b, sizeof(g_sp_db.b), &priv_key, sizeof(priv_key)) ||
+            memcpy_s(&g_sp_db.g_b, sizeof(g_sp_db.g_b), &pub_key, sizeof(pub_key)))
+        {
             Log("Error, cannot do memcpy", log::error);
             ret = SP_INTERNAL_ERROR;
             break;
@@ -118,11 +139,12 @@ int ServiceProvider::sp_ra_proc_msg1_req(Messages::MessageMSG1 msg1, Messages::M
         // Generate the client/SP shared secret
         sample_ec_dh_shared_t dh_key = {{0}};
 
-        sample_ret = sample_ecc256_compute_shared_dhkey(&priv_key, (sample_ec256_public_t *)&client_pub_key,
-                     (sample_ec256_dh_shared_t *)&dh_key,
-                     ecc_state);
+        sample_ret = sample_ecc256_compute_shared_dhkey(&priv_key, (sample_ec256_public_t *) &client_pub_key,
+                                                        (sample_ec256_dh_shared_t *) &dh_key,
+                                                        ecc_state);
 
-        if (SAMPLE_SUCCESS != sample_ret) {
+        if (SAMPLE_SUCCESS != sample_ret)
+        {
             Log("Error, compute share key fail", log::error);
             ret = SP_INTERNAL_ERROR;
             break;
@@ -131,7 +153,8 @@ int ServiceProvider::sp_ra_proc_msg1_req(Messages::MessageMSG1 msg1, Messages::M
 
         // smk is only needed for msg2 generation.
         derive_ret = derive_key(&dh_key, SAMPLE_DERIVE_KEY_SMK, &g_sp_db.smk_key);
-        if (derive_ret != true) {
+        if (derive_ret != true)
+        {
             Log("Error, derive key fail", log::error);
             ret = SP_INTERNAL_ERROR;
             break;
@@ -139,31 +162,34 @@ int ServiceProvider::sp_ra_proc_msg1_req(Messages::MessageMSG1 msg1, Messages::M
 
         // The rest of the keys are the shared secrets for future communication.
         derive_ret = derive_key(&dh_key, SAMPLE_DERIVE_KEY_MK, &g_sp_db.mk_key);
-        if (derive_ret != true) {
+        if (derive_ret != true)
+        {
             Log("Error, derive key fail", log::error);
             ret = SP_INTERNAL_ERROR;
             break;
         }
 
         derive_ret = derive_key(&dh_key, SAMPLE_DERIVE_KEY_SK, &g_sp_db.sk_key);
-        if (derive_ret != true) {
+        if (derive_ret != true)
+        {
             Log("Error, derive key fail", log::error);
             ret = SP_INTERNAL_ERROR;
             break;
         }
 
         derive_ret = derive_key(&dh_key, SAMPLE_DERIVE_KEY_VK, &g_sp_db.vk_key);
-        if (derive_ret != true) {
+        if (derive_ret != true)
+        {
             Log("Error, derive key fail", log::error);
             ret = SP_INTERNAL_ERROR;
             break;
         }
 
-
         uint32_t msg2_size = sizeof(sgx_ra_msg2_t) + sig_rl_size;
-        p_msg2_full = (ra_samp_response_header_t*)malloc(msg2_size + sizeof(ra_samp_response_header_t));
+        p_msg2_full = (ra_samp_response_header_t *) malloc(msg2_size + sizeof(ra_samp_response_header_t));
 
-        if (!p_msg2_full) {
+        if (!p_msg2_full)
+        {
             Log("Error, Error, out of memory", log::error);
             ret = SP_INTERNAL_ERROR;
             break;
@@ -181,12 +207,13 @@ int ServiceProvider::sp_ra_proc_msg1_req(Messages::MessageMSG1 msg1, Messages::M
         uint8_t *spidBa;
         HexStringToByteArray(Settings::spid, &spidBa);
 
-        for (int i=0; i<16; i++)
+        for (int i = 0; i < 16; i++)
             p_msg2->spid.id[i] = spidBa[i];
 
 
         // Assemble MSG2
-        if(memcpy_s(&p_msg2->g_b, sizeof(p_msg2->g_b), &g_sp_db.g_b, sizeof(g_sp_db.g_b))) {
+        if (memcpy_s(&p_msg2->g_b, sizeof(p_msg2->g_b), &g_sp_db.g_b, sizeof(g_sp_db.g_b)))
+        {
             Log("Error, memcpy failed", log::error);
             ret = SP_INTERNAL_ERROR;
             break;
@@ -199,43 +226,47 @@ int ServiceProvider::sp_ra_proc_msg1_req(Messages::MessageMSG1 msg1, Messages::M
         // Create gb_ga
         sgx_ec256_public_t gb_ga[2];
         if (memcpy_s(&gb_ga[0], sizeof(gb_ga[0]), &g_sp_db.g_b, sizeof(g_sp_db.g_b)) ||
-                memcpy_s(&gb_ga[1], sizeof(gb_ga[1]), &g_sp_db.g_a, sizeof(g_sp_db.g_a))) {
+            memcpy_s(&gb_ga[1], sizeof(gb_ga[1]), &g_sp_db.g_a, sizeof(g_sp_db.g_a)))
+        {
             Log("Error, memcpy failed", log::error);
             ret = SP_INTERNAL_ERROR;
             break;
         }
 
         // Sign gb_ga
-        sample_ret = sample_ecdsa_sign((uint8_t *)&gb_ga, sizeof(gb_ga),
-                                       (sample_ec256_private_t *)&g_sp_priv_key,
-                                       (sample_ec256_signature_t *)&p_msg2->sign_gb_ga,
+        sample_ret = sample_ecdsa_sign((uint8_t *) &gb_ga, sizeof(gb_ga),
+                                       (sample_ec256_private_t *) &g_sp_priv_key,
+                                       (sample_ec256_signature_t *) &p_msg2->sign_gb_ga,
                                        ecc_state);
 
-        if (SAMPLE_SUCCESS != sample_ret) {
+        if (SAMPLE_SUCCESS != sample_ret)
+        {
             Log("Error, sign ga_gb fail", log::error);
             ret = SP_INTERNAL_ERROR;
             break;
         }
 
-
         // Generate the CMACsmk for gb||SPID||TYPE||KDF_ID||Sigsp(gb,ga)
         uint8_t mac[SAMPLE_EC_MAC_SIZE] = {0};
         uint32_t cmac_size = offsetof(sgx_ra_msg2_t, mac);
-        sample_ret = sample_rijndael128_cmac_msg(&g_sp_db.smk_key, (uint8_t *)&p_msg2->g_b, cmac_size, &mac);
+        sample_ret = sample_rijndael128_cmac_msg(&g_sp_db.smk_key, (uint8_t *) &p_msg2->g_b, cmac_size, &mac);
 
-        if (SAMPLE_SUCCESS != sample_ret) {
+        if (SAMPLE_SUCCESS != sample_ret)
+        {
             Log("Error, cmac fail", log::error);
             ret = SP_INTERNAL_ERROR;
             break;
         }
 
-        if (memcpy_s(&p_msg2->mac, sizeof(p_msg2->mac), mac, sizeof(mac))) {
+        if (memcpy_s(&p_msg2->mac, sizeof(p_msg2->mac), mac, sizeof(mac)))
+        {
             Log("Error, memcpy failed", log::error);
             ret = SP_INTERNAL_ERROR;
             break;
         }
 
-        if (memcpy_s(&p_msg2->sig_rl[0], sig_rl_size, sig_rl, sig_rl_size)) {
+        if (memcpy_s(&p_msg2->sig_rl[0], sig_rl_size, sig_rl, sig_rl_size))
+        {
             Log("Error, memcpy failed", log::error);
             ret = SP_INTERNAL_ERROR;
             break;
@@ -243,13 +274,16 @@ int ServiceProvider::sp_ra_proc_msg1_req(Messages::MessageMSG1 msg1, Messages::M
 
         p_msg2->sig_rl_size = sig_rl_size;
 
-    } while(0);
+    } while (0);
 
 
-    if (ret) {
+    if (ret)
+    {
         *pp_msg2 = NULL;
         SafeFree(p_msg2_full);
-    } else {
+    }
+    else
+    {
 
         //=================   SET MSG2 Fields   ================
         msg2->set_size(p_msg2_full->size);
@@ -266,7 +300,8 @@ int ServiceProvider::sp_ra_proc_msg1_req(Messages::MessageMSG1 msg1, Messages::M
         msg2->set_quote_type(Settings::quote_type);
         msg2->set_cmac_kdf_id(AES_CMAC_KDF_ID);
 
-        for (auto x : p_msg2->sign_gb_ga.x) {
+        for (auto x : p_msg2->sign_gb_ga.x)
+        {
             msg2->add_signature_x(x);
         }
 
@@ -278,12 +313,13 @@ int ServiceProvider::sp_ra_proc_msg1_req(Messages::MessageMSG1 msg1, Messages::M
 
         msg2->set_size_sigrl(p_msg2->sig_rl_size);
 
-        for (int i=0; i<p_msg2->sig_rl_size; i++)
+        for (int i = 0; i < p_msg2->sig_rl_size; i++)
             msg2->add_sigrl(p_msg2->sig_rl[i]);
         //=====================================================
     }
 
-    if (ecc_state) {
+    if (ecc_state)
+    {
         sample_ecc256_close_context(ecc_state);
     }
 
@@ -291,30 +327,33 @@ int ServiceProvider::sp_ra_proc_msg1_req(Messages::MessageMSG1 msg1, Messages::M
 }
 
 
-sgx_ra_msg3_t* ServiceProvider::assembleMSG3(Messages::MessageMSG3 msg) {
-    sgx_ra_msg3_t *p_msg3 = (sgx_ra_msg3_t*) malloc(msg.size());
+sgx_ra_msg3_t *ServiceProvider::assembleMSG3(Messages::MessageMSG3 msg)
+{
+    sgx_ra_msg3_t *p_msg3 = (sgx_ra_msg3_t *) malloc(msg.size());
 
-    for (int i=0; i<SGX_MAC_SIZE; i++)
+    for (int i = 0; i < SGX_MAC_SIZE; i++)
         p_msg3->mac[i] = msg.sgx_mac(i);
 
-    for (int i=0; i<SGX_ECP256_KEY_SIZE; i++) {
+    for (int i = 0; i < SGX_ECP256_KEY_SIZE; i++)
+    {
         p_msg3->g_a.gx[i] = msg.gax_msg3(i);
         p_msg3->g_a.gy[i] = msg.gay_msg3(i);
     }
 
-    for (int i=0; i<256; i++)
+    for (int i = 0; i < 256; i++)
         p_msg3->ps_sec_prop.sgx_ps_sec_prop_desc[i] = msg.sec_property(i);
 
-    for (int i=0; i<1116; i++)
+    for (int i = 0; i < 1116; i++)
         p_msg3->quote[i] = msg.quote(i);
 
     return p_msg3;
 }
 
 
-
 // Process remote attestation message 3
-int ServiceProvider::sp_ra_proc_msg3_req(Messages::MessageMSG3 msg, Messages::AttestationMessage *att_msg) {
+
+int ServiceProvider::sp_ra_proc_msg3_req(Messages::MessageMSG3 msg, Messages::AttestationMessage *att_msg)
+{
     int ret = 0;
     sample_status_t sample_ret = SAMPLE_SUCCESS;
     const uint8_t *p_msg3_cmaced = NULL;
@@ -322,7 +361,7 @@ int ServiceProvider::sp_ra_proc_msg3_req(Messages::MessageMSG3 msg, Messages::At
     sample_sha_state_handle_t sha_handle = NULL;
     sample_report_data_t report_data = {0};
     sample_ra_att_result_msg_t *p_att_result_msg = NULL;
-    ra_samp_response_header_t* p_att_result_msg_full = NULL;
+    ra_samp_response_header_t *p_att_result_msg_full = NULL;
     uint32_t i;
     sgx_ra_msg3_t *p_msg3 = NULL;
     uint32_t att_result_msg_size;
@@ -331,14 +370,17 @@ int ServiceProvider::sp_ra_proc_msg3_req(Messages::MessageMSG3 msg, Messages::At
     p_msg3 = assembleMSG3(msg);
 
     // Check to see if we have registered?
-    if (!g_is_sp_registered) {
+    if (!g_is_sp_registered)
+    {
         Log("Unsupported extended EPID group", log::error);
         return -1;
     }
 
-    do {
+    do
+    {
         // Compare g_a in message 3 with local g_a.
-        if (memcmp(&g_sp_db.g_a, &p_msg3->g_a, sizeof(sgx_ec256_public_t))) {
+        if (memcmp(&g_sp_db.g_a, &p_msg3->g_a, sizeof(sgx_ec256_public_t)))
+        {
             Log("Error, g_a is not same", log::error);
             ret = SP_PROTOCOL_ERROR;
             break;
@@ -346,26 +388,30 @@ int ServiceProvider::sp_ra_proc_msg3_req(Messages::MessageMSG3 msg, Messages::At
 
         //Make sure that msg3_size is bigger than sample_mac_t.
         uint32_t mac_size = msg.size() - sizeof(sample_mac_t);
-        p_msg3_cmaced = reinterpret_cast<const uint8_t*>(p_msg3);
+        p_msg3_cmaced = reinterpret_cast<const uint8_t *>(p_msg3);
         p_msg3_cmaced += sizeof(sample_mac_t);
 
         // Verify the message mac using SMK
         sample_cmac_128bit_tag_t mac = {0};
         sample_ret = sample_rijndael128_cmac_msg(&g_sp_db.smk_key, p_msg3_cmaced, mac_size, &mac);
 
-        if (SAMPLE_SUCCESS != sample_ret) {
+        if (SAMPLE_SUCCESS != sample_ret)
+        {
             Log("Error, cmac fail", log::error);
             ret = SP_INTERNAL_ERROR;
             break;
         }
 
-        if (memcmp(&p_msg3->mac, mac, sizeof(mac))) {
+        if (memcmp(&p_msg3->mac, mac, sizeof(mac)))
+        {
             Log("Error, verify cmac fail", log::error);
             ret = SP_INTEGRITY_FAILED;
             break;
         }
 
-        if (memcpy_s(&g_sp_db.ps_sec_prop, sizeof(g_sp_db.ps_sec_prop), &p_msg3->ps_sec_prop, sizeof(p_msg3->ps_sec_prop))) {
+        if (memcpy_s(&g_sp_db.ps_sec_prop, sizeof(g_sp_db.ps_sec_prop), &p_msg3->ps_sec_prop,
+                     sizeof(p_msg3->ps_sec_prop)))
+        {
             Log("Error, memcpy fail", log::error);
             ret = SP_INTERNAL_ERROR;
             break;
@@ -378,41 +424,47 @@ int ServiceProvider::sp_ra_proc_msg3_req(Messages::MessageMSG3 msg, Messages::At
         // The first 32 bytes of report_data are SHA256 HASH of {ga|gb|vk}.
         // The second 32 bytes of report_data are set to zero.
         sample_ret = sample_sha256_init(&sha_handle);
-        if (sample_ret != SAMPLE_SUCCESS) {
+        if (sample_ret != SAMPLE_SUCCESS)
+        {
             Log("Error, init hash failed", log::error);
             ret = SP_INTERNAL_ERROR;
             break;
         }
 
-        sample_ret = sample_sha256_update((uint8_t *)&(g_sp_db.g_a), sizeof(g_sp_db.g_a), sha_handle);
-        if (sample_ret != SAMPLE_SUCCESS) {
+        sample_ret = sample_sha256_update((uint8_t *) &(g_sp_db.g_a), sizeof(g_sp_db.g_a), sha_handle);
+        if (sample_ret != SAMPLE_SUCCESS)
+        {
             Log("Error, udpate hash failed", log::error);
             ret = SP_INTERNAL_ERROR;
             break;
         }
 
-        sample_ret = sample_sha256_update((uint8_t *)&(g_sp_db.g_b), sizeof(g_sp_db.g_b), sha_handle);
-        if (sample_ret != SAMPLE_SUCCESS) {
+        sample_ret = sample_sha256_update((uint8_t *) &(g_sp_db.g_b), sizeof(g_sp_db.g_b), sha_handle);
+        if (sample_ret != SAMPLE_SUCCESS)
+        {
             Log("Error, udpate hash failed", log::error);
             ret = SP_INTERNAL_ERROR;
             break;
         }
 
-        sample_ret = sample_sha256_update((uint8_t *)&(g_sp_db.vk_key), sizeof(g_sp_db.vk_key), sha_handle);
-        if (sample_ret != SAMPLE_SUCCESS) {
+        sample_ret = sample_sha256_update((uint8_t *) &(g_sp_db.vk_key), sizeof(g_sp_db.vk_key), sha_handle);
+        if (sample_ret != SAMPLE_SUCCESS)
+        {
             Log("Error, udpate hash failed", log::error);
             ret = SP_INTERNAL_ERROR;
             break;
         }
 
-        sample_ret = sample_sha256_get_hash(sha_handle, (sample_sha256_hash_t *)&report_data);
-        if (sample_ret != SAMPLE_SUCCESS) {
+        sample_ret = sample_sha256_get_hash(sha_handle, (sample_sha256_hash_t *) &report_data);
+        if (sample_ret != SAMPLE_SUCCESS)
+        {
             Log("Error, Get hash failed", log::error);
             ret = SP_INTERNAL_ERROR;
             break;
         }
 
-        if (memcmp((uint8_t *)&report_data, (uint8_t *)&(p_quote->report_body.report_data), sizeof(report_data))) {
+        if (memcmp((uint8_t *) &report_data, (uint8_t *) &(p_quote->report_body.report_data), sizeof(report_data)))
+        {
             Log("Error, verify hash failed", log::error);
             ret = SP_INTEGRITY_FAILED;
             break;
@@ -420,9 +472,11 @@ int ServiceProvider::sp_ra_proc_msg3_req(Messages::MessageMSG3 msg, Messages::At
 
         // Verify quote with attestation server.
         ias_att_report_t attestation_report = {0};
-        ret = ias_verify_attestation_evidence(p_msg3->quote, p_msg3->ps_sec_prop.sgx_ps_sec_prop_desc, &attestation_report, ws);
+        ret = ias_verify_attestation_evidence(p_msg3->quote, p_msg3->ps_sec_prop.sgx_ps_sec_prop_desc,
+                                              &attestation_report, ws);
 
-        if (0 != ret) {
+        if (0 != ret)
+        {
             ret = SP_IAS_FAILED;
             break;
         }
@@ -431,7 +485,7 @@ int ServiceProvider::sp_ra_proc_msg3_req(Messages::MessageMSG3 msg, Messages::At
         Log("\tid: %s", attestation_report.id);
         Log("\tstatus: %d", attestation_report.status);
         Log("\trevocation_reason: %u", attestation_report.revocation_reason);
-        Log("\tpse_status: %d",  attestation_report.pse_status);
+        Log("\tpse_status: %d", attestation_report.pse_status);
 
         Log("Enclave Report:");
         Log("\tSignature Type: 0x%x", p_quote->sign_type);
@@ -447,26 +501,31 @@ int ServiceProvider::sp_ra_proc_msg3_req(Messages::MessageMSG3 msg, Messages::At
         // Respond the client with the results of the attestation.
         att_result_msg_size = sizeof(sample_ra_att_result_msg_t);
 
-        p_att_result_msg_full = (ra_samp_response_header_t*) malloc(att_result_msg_size + sizeof(ra_samp_response_header_t) + sizeof(validation_result));
-        if (!p_att_result_msg_full) {
+        p_att_result_msg_full = (ra_samp_response_header_t *) malloc(
+                att_result_msg_size + sizeof(ra_samp_response_header_t) + sizeof(validation_result));
+        if (!p_att_result_msg_full)
+        {
             Log("Error, out of memory", log::error);
             ret = SP_INTERNAL_ERROR;
             break;
         }
 
-        memset(p_att_result_msg_full, 0, att_result_msg_size + sizeof(ra_samp_response_header_t) + sizeof(validation_result));
+        memset(p_att_result_msg_full, 0,
+               att_result_msg_size + sizeof(ra_samp_response_header_t) + sizeof(validation_result));
         p_att_result_msg_full->type = RA_ATT_RESULT;
         p_att_result_msg_full->size = att_result_msg_size;
 
-        if (IAS_QUOTE_OK != attestation_report.status) {
+        if (IAS_QUOTE_OK != attestation_report.status)
+        {
             p_att_result_msg_full->status[0] = 0xFF;
         }
 
-        if (IAS_PSE_OK != attestation_report.pse_status) {
+        if (IAS_PSE_OK != attestation_report.pse_status)
+        {
             p_att_result_msg_full->status[1] = 0xFF;
         }
 
-        p_att_result_msg = (sample_ra_att_result_msg_t *)p_att_result_msg_full->body;
+        p_att_result_msg = (sample_ra_att_result_msg_t *) p_att_result_msg_full->body;
 
         bool isv_policy_passed = true;
 
@@ -475,11 +534,12 @@ int ServiceProvider::sp_ra_proc_msg3_req(Messages::MessageMSG3 msg, Messages::At
         // Generate mac based on the mk key.
         mac_size = sizeof(ias_platform_info_blob_t);
         sample_ret = sample_rijndael128_cmac_msg(&g_sp_db.mk_key,
-                     (const uint8_t*)&p_att_result_msg->platform_info_blob,
-                     mac_size,
-                     &p_att_result_msg->mac);
+                                                 (const uint8_t *) &p_att_result_msg->platform_info_blob,
+                                                 mac_size,
+                                                 &p_att_result_msg->mac);
 
-        if (SAMPLE_SUCCESS != sample_ret) {
+        if (SAMPLE_SUCCESS != sample_ret)
+        {
             Log("Error, cmac fail", log::error);
             ret = SP_INTERNAL_ERROR;
             break;
@@ -489,11 +549,13 @@ int ServiceProvider::sp_ra_proc_msg3_req(Messages::MessageMSG3 msg, Messages::At
         uint8_t aes_gcm_iv[SAMPLE_SP_IV_SIZE] = {0};
         p_att_result_msg->secret.payload_size = MAX_VERIFICATION_RESULT;
 
-        Log("status %d (ok %d) pse status %d (ok %d) policy %d", attestation_report.status, IAS_QUOTE_OK, attestation_report.pse_status, IAS_PSE_OK, isv_policy_passed);
+        Log("status %d (ok %d) pse status %d (ok %d) policy %d", attestation_report.status, IAS_QUOTE_OK,
+            attestation_report.pse_status, IAS_PSE_OK, isv_policy_passed);
 
         if ((IAS_QUOTE_OK == attestation_report.status || IAS_QUOTE_GROUP_OUT_OF_DATE == attestation_report.status) &&
-                (IAS_PSE_OK == attestation_report.pse_status) &&
-                (isv_policy_passed == true)) {
+            (IAS_PSE_OK == attestation_report.pse_status) &&
+            (isv_policy_passed == true))
+        {
 
             if (attestation_report.status == IAS_QUOTE_GROUP_OUT_OF_DATE)
             {
@@ -513,12 +575,6 @@ int ServiceProvider::sp_ra_proc_msg3_req(Messages::MessageMSG3 msg, Messages::At
                                                 NULL,
                                                 0,
                                                 &p_att_result_msg->secret.payload_tag);
-
-            for (int i = 0; i < 16; i++)
-            {
-                Log("  Payload tag byte %d: %d", i, (int)p_att_result_msg->secret.payload_tag[i]);
-            }
-
         }
         else
         {
@@ -526,12 +582,15 @@ int ServiceProvider::sp_ra_proc_msg3_req(Messages::MessageMSG3 msg, Messages::At
                 attestation_report.status, attestation_report.pse_status, isv_policy_passed);
         }
 
-    } while(0);
+    } while (0);
 
-    if (ret) {
+    if (ret)
+    {
         SafeFree(p_att_result_msg_full);
         return -1;
-    } else {
+    }
+    else
+    {
         att_msg->set_size(att_result_msg_size);
 
         ias_platform_info_blob_t platform_info_blob = p_att_result_msg->platform_info_blob;
@@ -539,38 +598,181 @@ int ServiceProvider::sp_ra_proc_msg3_req(Messages::MessageMSG3 msg, Messages::At
         att_msg->set_tcb_evaluation_status(platform_info_blob.sample_tcb_evaluation_status);
         att_msg->set_pse_evaluation_status(platform_info_blob.pse_evaluation_status);
 
-        for (int i=0; i<PSVN_SIZE; i++)
+        for (int i = 0; i < PSVN_SIZE; i++)
             att_msg->add_latest_equivalent_tcb_psvn(platform_info_blob.latest_equivalent_tcb_psvn[i]);
 
-        for (int i=0; i<ISVSVN_SIZE; i++)
+        for (int i = 0; i < ISVSVN_SIZE; i++)
             att_msg->add_latest_pse_isvsvn(platform_info_blob.latest_pse_isvsvn[i]);
 
-        for (int i=0; i<PSDA_SVN_SIZE; i++)
+        for (int i = 0; i < PSDA_SVN_SIZE; i++)
             att_msg->add_latest_psda_svn(platform_info_blob.latest_psda_svn[i]);
 
-        for (int i=0; i<GID_SIZE; i++)
+        for (int i = 0; i < GID_SIZE; i++)
             att_msg->add_performance_rekey_gid(platform_info_blob.performance_rekey_gid[i]);
 
-        for (int i=0; i<SAMPLE_NISTP256_KEY_SIZE; i++) {
+        for (int i = 0; i < SAMPLE_NISTP256_KEY_SIZE; i++)
+        {
             att_msg->add_ec_sign256_x(platform_info_blob.signature.x[i]);
             att_msg->add_ec_sign256_y(platform_info_blob.signature.y[i]);
         }
 
-        for (int i=0; i<SAMPLE_MAC_SIZE; i++)
+        for (int i = 0; i < SAMPLE_MAC_SIZE; i++)
             att_msg->add_mac_smk(p_att_result_msg->mac[i]);
 
         att_msg->set_result_size(p_att_result_msg->secret.payload_size);
 
-        for (int i=0; i<12; i++)
+        for (int i = 0; i < 12; i++)
             att_msg->add_reserved(p_att_result_msg->secret.reserved[i]);
 
-        for (int i=0; i<16; i++)
+        for (int i = 0; i < 16; i++)
             att_msg->add_payload_tag(p_att_result_msg->secret.payload_tag[i]);
 
-        for (int i=0; i<p_att_result_msg->secret.payload_size; i++)
+        for (int i = 0; i < p_att_result_msg->secret.payload_size; i++)
             att_msg->add_payload(p_att_result_msg->secret.payload[i]);
     }
 
     return ret;
 }
 
+
+string ServiceProvider::handleMSG0(Messages::MessageMsg0 msg)
+{
+    Log("MSG0 received");
+
+    if (msg.status() != TYPE_TERMINATE)
+    {
+        uint32_t extended_epid_group_id = msg.epid();
+        int ret = this->sp_ra_proc_msg0_req(extended_epid_group_id);
+
+        if (ret == 0)
+        {
+            msg.set_status(TYPE_OK);
+            return nm->serialize(msg);
+        }
+    }
+    else
+    {
+        Log("Termination received!");
+    }
+
+    return "";
+}
+
+
+string ServiceProvider::handleMSG1(Messages::MessageMSG1 msg1)
+{
+    Log("MSG1 received");
+
+    Messages::MessageMSG2 msg2;
+    msg2.set_type(RA_MSG2);
+
+    int ret = this->sp_ra_proc_msg1_req(msg1, &msg2);
+
+    if (ret != 0)
+    {
+        Log("Error, processing MSG1 failed");
+    }
+    else
+    {
+        Log("MSG1 processed correctly and MSG2 created");
+        return nm->serialize(msg2);
+    }
+
+    return "";
+}
+
+
+string ServiceProvider::handleMSG3(Messages::MessageMSG3 msg)
+{
+    Log("MSG3 received");
+
+    Messages::AttestationMessage att_msg;
+    att_msg.set_type(RA_ATT_RESULT);
+
+    int ret = this->sp_ra_proc_msg3_req(msg, &att_msg);
+
+    if (ret == -1)
+    {
+        Log("Error, processing MSG3 failed");
+    }
+    else
+    {
+        Log("MSG3 processed correctly and attestation result created");
+        return nm->serialize(att_msg);
+    }
+
+    return "";
+}
+
+
+string ServiceProvider::handleAppAttOk()
+{
+    Log("APP attestation result received");
+    return "";
+}
+
+
+vector<string> ServiceProvider::incomingHandler(string v, int type)
+{
+    vector<string> res;
+
+    string s;
+    bool ret;
+
+    switch (type)
+    {
+        case RA_MSG0:
+        {
+            Messages::MessageMsg0 msg0;
+            ret = msg0.ParseFromString(v);
+            if (ret && (msg0.type() == RA_MSG0))
+            {
+                s = this->handleMSG0(msg0);
+                res.push_back(to_string(RA_MSG0));
+            }
+        }
+            break;
+        case RA_MSG1:
+        {
+            Messages::MessageMSG1 msg1;
+            ret = msg1.ParseFromString(v);
+            if (ret && (msg1.type() == RA_MSG1))
+            {
+                s = this->handleMSG1(msg1);
+                res.push_back(to_string(RA_MSG2));
+            }
+        }
+            break;
+        case RA_MSG3:
+        {
+            Messages::MessageMSG3 msg3;
+            ret = msg3.ParseFromString(v);
+            if (ret && (msg3.type() == RA_MSG3))
+            {
+                s = this->handleMSG3(msg3);
+                res.push_back(to_string(RA_ATT_RESULT));
+            }
+        }
+            break;
+        case RA_APP_ATT_OK:
+        {
+            Messages::SecretMessage sec_msg;
+            ret = sec_msg.ParseFromString(v);
+            if (ret)
+            {
+                if (sec_msg.type() == RA_APP_ATT_OK)
+                {
+                    this->handleAppAttOk();
+                }
+            }
+        }
+            break;
+        default:
+            Log("Unknown type: %d", type, log::error);
+            break;
+    }
+
+    res.push_back(s);
+
+    return res;
+}

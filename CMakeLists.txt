@@ -21,10 +21,10 @@ set(SP_SOURCE_FILES
         Util/Base64.cpp
         Util/LogBase.cpp
         Util/UtilityFunctions.cpp
+        Networking/NetworkManagerServer.cpp
         Networking/AbstractNetworkOps.cpp
         Networking/Client.cpp
         Networking/NetworkManager.cpp
-        Networking/NetworkManagerClient.cpp
         Networking/Server.cpp
         Networking/Session.cpp
         GoogleMessages/Messages.pb.cc
@@ -38,6 +38,7 @@ add_executable(isv_app ${SP_SOURCE_FILES})
 
 target_include_directories (isv_app
         PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}/ServiceProvider/service_provider
         ${SGX_DIR}/include
         headers
@@ -89,7 +90,7 @@ set (APP_SOURCE_FILES
         Networking/Session.cpp
         Networking/Server.cpp
         Networking/Client.cpp
-        Networking/NetworkManagerServer.cpp
+        Networking/NetworkManagerClient.cpp
         GoogleMessages/Messages.pb.cc
         Networking/AbstractNetworkOps.cpp
         Util/UtilityFunctions.cpp
@@ -101,6 +102,7 @@ add_executable(app ${APP_SOURCE_FILES})
 
 target_include_directories (app
         PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}/Util
         ${CMAKE_CURRENT_SOURCE_DIR}/MessageHandler
         ${CMAKE_CURRENT_SOURCE_DIR}/Enclave

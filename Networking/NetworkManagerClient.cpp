@@ -1,13 +1,18 @@
 #include "NetworkManagerClient.h"
-#include "../GeneralSettings.h"
-
-NetworkManagerClient* NetworkManagerClient::instance = NULL;
-
-NetworkManagerClient::NetworkManagerClient() {}
+#include "GeneralSettings.h"
 
 
-void NetworkManagerClient::Init() {
-    if (client) {
+NetworkManagerClient *NetworkManagerClient::instance = NULL;
+
+
+NetworkManagerClient::NetworkManagerClient()
+{}
+
+
+void NetworkManagerClient::Init()
+{
+    if (client)
+    {
         delete client;
         client = NULL;
     }
@@ -23,8 +28,10 @@ void NetworkManagerClient::Init() {
 }
 
 
-NetworkManagerClient* NetworkManagerClient::getInstance(int port,  std::string host) {
-    if (instance == NULL) {
+NetworkManagerClient *NetworkManagerClient::getInstance(int port, std::string host)
+{
+    if (instance == NULL)
+    {
         instance = new NetworkManagerClient();
         instance->setPort(port);
         instance->setHost(host);
@@ -34,42 +41,19 @@ NetworkManagerClient* NetworkManagerClient::getInstance(int port,  std::string h
 }
 
 
-void NetworkManagerClient::startService() {
+void NetworkManagerClient::startService()
+{
     this->client->startConnection();
 }
 
 
-void NetworkManagerClient::setHost(std::string host) {
+void NetworkManagerClient::setHost(std::string host)
+{
     this->host = host;
 }
 
 
-void NetworkManagerClient::connectCallbackHandler(CallbackHandler cb) {
+void NetworkManagerClient::connectCallbackHandler(CallbackHandler cb)
+{
     this->client->setCallbackHandler(cb);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

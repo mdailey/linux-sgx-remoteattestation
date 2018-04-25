@@ -1,15 +1,23 @@
 #include "Session.h"
 
+
 #include <boost/lexical_cast.hpp>
+
 
 using namespace util;
 
-Session::Session(boost::asio::io_service& io_service, boost::asio::ssl::context& context) : AbstractNetworkOps(io_service, context) {}
 
-Session::~Session() {}
+Session::Session(boost::asio::io_service &io_service, boost::asio::ssl::context &context) : AbstractNetworkOps(
+        io_service, context)
+{}
 
 
-void Session::start() {
+Session::~Session()
+{}
+
+
+void Session::start()
+{
     Log("Connection from %s", socket().remote_endpoint().address().to_string());
 
     socket_.async_handshake(boost::asio::ssl::stream_base::server,
@@ -18,16 +26,19 @@ void Session::start() {
 }
 
 
-void Session::handle_handshake(const boost::system::error_code& error) {
-    if (!error) {
+void Session::handle_handshake(const boost::system::error_code &error)
+{
+    if (!error)
+    {
         Log("Handshake successful");
+        // Call session init callback
+        //this->init_handler
         this->read();
-    } else {
+    }
+    else
+    {
         Log("Handshake was not successful: %s", error.message(), log::error);
         delete this;
     }
 }
-
-
-
 

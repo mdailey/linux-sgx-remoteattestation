@@ -1,16 +1,22 @@
 #include "NetworkManager.h"
 
-NetworkManager::NetworkManager() {}
 
-NetworkManager::~NetworkManager() {}
+NetworkManager::NetworkManager()
+{}
 
 
-void NetworkManager::setPort(int port) {
+NetworkManager::~NetworkManager()
+{}
+
+
+void NetworkManager::setPort(int port)
+{
     this->port = port;
 }
 
 
-void NetworkManager::printMsg(bool send, const char* msg) {
+void NetworkManager::printMsg(bool send, const char *msg)
+{
     string s(msg);
     replace(s.begin(), s.end(), '\n', '-');
     if (send)
@@ -18,7 +24,3 @@ void NetworkManager::printMsg(bool send, const char* msg) {
     else
         Log("Received msg: '%s'", s);
 }
-
-
-
-
